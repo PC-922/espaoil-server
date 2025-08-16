@@ -1,0 +1,63 @@
+package espaoil.server.application.usecases
+
+import espaoil.server.application.exceptions.FailedToUpdateGasStation
+import espaoil.server.application.ports.GasStationPersister
+import espaoil.server.application.ports.GasStationsRetriever
+import espaoil.server.domain.fixtures.valueobjects.GasStationFixtures.Companion.multipleGasStationsWithinAFiveKilometersRadius
+import io.mockk.Called
+import io.mockk.every
+import io.mockk.impl.annotations.MockK
+import io.mockk.impl.annotations.RelaxedMockK
+import io.mockk.junit5.MockKExtension
+import io.mockk.verify
+import io.mockk.verifyOrder
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.extension.ExtendWith
+import kotlin.test.assertFailsWith
+
+@ExtendWith(MockKExtension::class)
+class UpdateGasStationsShould {
+    @MockK
+    private lateinit var gasStationsRetriever: GasStationsRetriever
+    @RelaxedMockK
+    private lateinit var gasStationsPersister: GasStationPersister
+    private lateinit var updateGasStations: UpdateGasStations
+    private val someGasStations = multipleGasStationsWithinAFiveKilometersRadius()
+
+    @BeforeEach
+    fun setUp() {
+        updateGasStations = UpdateGasStations(gasStationsRetriever, gasStationsPersister)
+    }
+
+    @Test
+    internal fun `download information for gas stations`() {
+        every { gasStationsRetriever.apply() }.returns(Result.success(someGasStations))
+
+        updateGasStations.execute()
+
+        verifyOrder {
+            gasStationsPersister.replace(someGasStations)
+        }
+    }
+
+    @Test
+    fun `raise an error when something fails while retrieving gas stations`() {
+        every { gasStationsRetriever.apply() }.returns(Result.failure(RuntimeException()))
+
+        assertFailsWith<FailedToUpdateGasStation> { updateGasStations.execute() }
+    }
+
+    @Test
+    fun `not replace all gas stations when retrieving empty list of gas stations`() {
+        every { gasStationsRetriever.apply() }.returns(Result.success(listOf()))
+
+        updateGasStations.execute()
+
+        verify {
+            gasStationsPersister wasNot Called
+        }
+    }
+
+
+}

@@ -1,0 +1,21 @@
+@host = localhost
+@port = 8080
+@baseUrl = http://{{host}}:{{port}}
+
+### Health check
+GET {{baseUrl}}/health
+
+### Near gas stations (Madrid, default distance=5000, gasType=GASOLINA_95_E5)
+GET {{baseUrl}}/gas-stations/near?lat=40.4168&lon=-3.7038
+
+### Near gas stations (Madrid, explicit distance and gas type)
+GET {{baseUrl}}/gas-stations/near?lat=40.4168&lon=-3.7038&distance=5000&gasType=GASOLINA_95_E5
+
+### Near gas stations (Barcelona, gasoil A)
+GET {{baseUrl}}/gas-stations/near?lat=41.3874&lon=2.1686&distance=7000&gasType=GASOIL_A
+
+### Near gas stations (invalid/missing coords → expect 400)
+GET {{baseUrl}}/gas-stations/near?lat=&lon=
+
+### Trigger gas stations update (fetch from government source and persist)
+POST {{baseUrl}}/gas-stations/update

@@ -1,0 +1,16 @@
+package espaoil.server.infrastructure.utils
+
+const val GASOLINA_95_E5 = "95_E5"
+const val GASOLINA_95_E5_PREMIUM = "95_E5_Premium"
+const val GASOLINA_95_E10 = "95_E10"
+const val GASOLINA_98_E5 = "98_E5"
+const val GASOLINA_98_E10 = "98_E10"
+const val GASOIL_A = "Gasoil_A"
+const val GASOIL_B = "Gasoil_B"
+const val GASOIL_PREMIUM = "Gasoil_Premium"
+const val BIODIESEL = "Biodiesel"
+const val BIOETANOL = "Bioetanol"
+const val GAS_NATURAL_COMPRIMIDO = "Gas_Natural_Comprimido"
+const val GAS_NATURAL_LICUADO = "Gas_Natural_Licuado"
+const val GASES_LICUADOS_DEL_PETROLEO = "Gases_licuados_del_petróleo"
+const val HIDROGENO = "Hidrógeno"
