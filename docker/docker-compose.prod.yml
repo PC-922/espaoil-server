@@ -1,0 +1,9 @@
+version: '3.8'
+
+services:
+  espaoilserver:
+    build: .
+    image: espaoilserver:latest
+    container_name: espaoilserver
+    ports:
+      - "8080:8080"
