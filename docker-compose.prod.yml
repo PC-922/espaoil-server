@@ -2,9 +2,14 @@ version: '3.8'
 
 services:
   espaoilserver:
-    build:
-      context: .
-      dockerfile: Dockerfile.prod
+    build: .
+    image: espaoilserver:latest
     container_name: espaoilserver
     ports:
       - "8080:8080"
+    networks:
+      - n8n-net
+
+networks:
+  n8n-net:
+    external: true
