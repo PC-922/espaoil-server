@@ -3,7 +3,7 @@ COPY --chown=gradle:gradle . /home/gradle/src
 WORKDIR /home/gradle/src
 RUN gradle shadowJar --no-daemon
 
-FROM eclipse-temurin:17-jre-alpine
+FROM --platform=linux/amd64 eclipse-temurin:17-jre
 RUN mkdir /app
 COPY --from=build /home/gradle/src/app/build/libs/*-all.jar /app/espaoil-server.jar
 EXPOSE 8080
