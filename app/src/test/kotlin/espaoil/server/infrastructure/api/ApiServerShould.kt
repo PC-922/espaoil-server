@@ -29,7 +29,38 @@ class ApiServerShould {
     fun `serve near gas stations when using short key gasType 95_E5`() {
         val port = findFreePort()
         val fakePersister = FakePersister()
-        server = ApiServer(fakePersister, port)
+        server = ApiServer(fakePersister, port = port)
+        server!!.startAsync()
+
+        waitForHealthy(port)
+
+        val url = URL("http://localhost:$port/gas-stations/near?lat=40.4168&lon=-3.7038&distance=5000&gasType=95_E5&sortBy=price")
+        val conn = (url.openConnection() as HttpURLConnection).apply {
+            requestMethod = "GET"
+            connectTimeout = 3000
+            readTimeout = 3000
+        }
+        val status = conn.responseCode
+        val body = conn.inputStream.use { it.readBytes().toString(StandardCharsets.UTF_8) }
+        conn.disconnect()
+
+        assertEquals(200, status)
+        val jsonArray = JsonParser.parseString(body).asJsonArray
+        assertTrue(jsonArray.size() > 0, "Expected non-empty stations list")
+        val firstStation = jsonArray[0].asJsonObject
+        // price is now numeric
+        assertEquals(1.234, firstStation.get("price").asDouble, 0.0001)
+        assertTrue(firstStation.has("distance"), "Response must include distance field")
+        assertTrue(firstStation.has("trader"), "Response must include trader field")
+        // sortBy=price: cheapest first
+        val prices = jsonArray.map { it.asJsonObject.get("price").asDouble }
+        assertEquals(prices.sorted(), prices, "Results must be sorted by price ascending")
+    }
+
+    @Test
+    fun `defaults to price sort when sortBy missing`() {
+        val port = findFreePort()
+        server = ApiServer(FakePersister(), port = port)
         server!!.startAsync()
 
         waitForHealthy(port)
@@ -46,9 +77,32 @@ class ApiServerShould {
 
         assertEquals(200, status)
         val jsonArray = JsonParser.parseString(body).asJsonArray
-        assertTrue(jsonArray.size() > 0, "Expected non-empty stations list")
-        val prices = jsonArray.map { it.asJsonObject.get("price").asString }
-        assertTrue(prices.contains("1.234"), "Expected to find formatted price 1.234 in $prices")
+        val prices = jsonArray.map { it.asJsonObject.get("price").asDouble }
+        assertEquals(prices.sorted(), prices, "Default sort must be price ascending")
+    }
+
+    @Test
+    fun `sort by distance when sortBy=distance`() {
+        val port = findFreePort()
+        server = ApiServer(FakePersister(), port = port)
+        server!!.startAsync()
+
+        waitForHealthy(port)
+
+        val url = URL("http://localhost:$port/gas-stations/near?lat=40.4168&lon=-3.7038&distance=5000&gasType=95_E5&sortBy=distance")
+        val conn = (url.openConnection() as HttpURLConnection).apply {
+            requestMethod = "GET"
+            connectTimeout = 3000
+            readTimeout = 3000
+        }
+        val status = conn.responseCode
+        val body = conn.inputStream.use { it.readBytes().toString(StandardCharsets.UTF_8) }
+        conn.disconnect()
+
+        assertEquals(200, status)
+        val jsonArray = JsonParser.parseString(body).asJsonArray
+        val distances = jsonArray.map { it.asJsonObject.get("distance").asDouble }
+        assertEquals(distances.sorted(), distances, "Results must be sorted by distance ascending")
     }
 
     private fun waitForHealthy(port: Int, attempts: Int = 10, sleepMs: Long = 100L) {
@@ -75,7 +129,7 @@ class ApiServerShould {
     private fun findFreePort(): Int = ServerSocket(0).use { it.localPort }
 }
 
-private class FakePersister : GasStationPersister {
+internal class FakePersister : GasStationPersister {
     override fun replace(gasStation: List<GasStation>) = Result.success(Unit)
 
     override fun queryNearGasStations(coordinates: MaximumCoordinates, gasType: String): Result<List<GasStation>> {

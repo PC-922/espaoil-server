@@ -1,5 +1,6 @@
 package espaoil.server.infrastructure.dtos.output
 
+import espaoil.server.domain.valueobject.Coordinates
 import espaoil.server.domain.valueobject.GasStation
 import java.util.*
 import java.util.Locale.getDefault
@@ -8,30 +9,33 @@ import java.util.regex.Pattern
 private const val ARTICLES_REGEX = "(.*)\\s?\\((OS|A|OS|A|O|LAS|AS|LA|LES|LOS|S'|EL|L'|ELS|SES|ES|SA)\\)(.*)?|(.*)"
 
 data class NearGasStationDto(
+    val trader: String,
     val name: String,
     val town: String,
     val municipality: String,
     val schedule: String,
-    val price: String,
-    val latitude: String,
-    val longitude: String,
+    val price: Double,
+    val latitude: Double,
+    val longitude: Double,
+    val distance: Double,
 ) {
     companion object {
-        fun from(gasStation: GasStation, gasType: String): NearGasStationDto {
+        fun from(gasStation: GasStation, gasType: String, userCoordinates: Coordinates): NearGasStationDto {
+            val stationCoords = Coordinates(gasStation.latitude(), gasStation.longitude())
             return NearGasStationDto(
+                trader = gasStation.name,
                 name = gasStation.name,
                 town = formattedLocality(gasStation.locality()),
                 municipality = gasStation.municipality(),
                 schedule = gasStation.time(),
-                price = formatDecimal(gasStation.prices.getValue(gasType)),
-                latitude = formatDecimal(gasStation.latitude()),
-                longitude = formatDecimal(gasStation.longitude())
+                price = gasStation.prices.getValue(gasType),
+                latitude = gasStation.latitude(),
+                longitude = gasStation.longitude(),
+                distance = roundKm(userCoordinates.distanceTo(stationCoords))
             )
         }
 
-        private fun formatDecimal(value: Double): String {
-            return String.format(Locale.US, "%.3f", value)
-        }
+        private fun roundKm(km: Double): Double = Math.round(km * 1000) / 1000.0
 
         internal fun formattedLocality(locality: String): String {
             return capitalize(

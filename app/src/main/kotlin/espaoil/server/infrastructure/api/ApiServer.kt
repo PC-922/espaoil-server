@@ -6,6 +6,8 @@ import com.sun.net.httpserver.HttpServer
 import espaoil.server.application.ports.GasStationPersister
 import espaoil.server.application.usecases.RetrieveNearGasStation
 import espaoil.server.domain.valueobject.Coordinates
+import espaoil.server.infrastructure.adapters.NominatimGeocoder
+import espaoil.server.infrastructure.adapters.UpstreamGeocodingException
 import espaoil.server.infrastructure.dtos.output.NearGasStationDto
 import espaoil.server.infrastructure.utils.*
 import org.slf4j.Logger
@@ -17,8 +19,11 @@ import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.Executors
 
+private const val MAX_NEAR_RESULTS = 30
+
 class ApiServer(
     private val gasStationPersister: GasStationPersister,
+    private val geocoder: NominatimGeocoder = NominatimGeocoder(),
     private val port: Int = System.getenv("PORT")?.toIntOrNull() ?: 8080
 ) {
     private val gson = Gson()
@@ -32,32 +37,73 @@ class ApiServer(
 
         server.createContext("/health") { exchange ->
             handleGet(exchange) {
-                ok(exchange, mapOf("status" to "ok"))
+                ok(exchange, mapOf("status" to "ok", "live-reload" to "enabled", "test" to "hot-reload-working"))
             }
         }
 
         server.createContext("/gas-stations/near") { exchange ->
             handleGet(exchange) {
                 val params = queryParams(exchange.requestURI)
-                validateParameters(params).onFailure {
+                validateNearParameters(params).onFailure {
                     return@handleGet badRequest(exchange, mapOf("error" to it.message))
                 }
-                val lat = params["lat"]?.toDoubleOrNull()
-                val lon = params["lon"]?.toDoubleOrNull()
-                val distance = params["distance"]?.toIntOrNull() ?: 5000
+                val lat = params["lat"]!!.toDouble()
+                val lon = params["lon"]!!.toDouble()
+                val distance = params["distance"]!!.toInt()
                 val gasType = normalizeGasType(params["gasType"]!!)
-
-                if (lat == null || lon == null) {
-                    return@handleGet badRequest(exchange, mapOf("error" to "Missing or invalid lat/lon"))
-                }
+                val sortBy = (params["sortBy"] ?: "price").lowercase()
+                val userCoords = Coordinates(lat, lon)
 
                 val stations = RetrieveNearGasStation(gasStationPersister).execute(
-                        Coordinates(lat, lon),
-                        distance,
-                        gasType
-                    )
-                val payload = stations.map { NearGasStationDto.from(it, gasType) }
+                    userCoords, distance, gasType
+                )
+                val payload = stations
+                    .map { NearGasStationDto.from(it, gasType, userCoords) }
+                    .let { dtos ->
+                        when (sortBy) {
+                            "price" -> dtos.sortedBy { it.price }
+                            "distance" -> dtos.sortedBy { it.distance }
+                            else -> dtos.sortedBy { it.price }
+                        }
+                    }
+                    .take(MAX_NEAR_RESULTS)
                 return@handleGet ok(exchange, payload)
+            }
+        }
+
+        server.createContext("/geocoding/search") { exchange ->
+            handleGet(exchange) {
+                val params = queryParams(exchange.requestURI)
+                val q = params["q"]?.trim()
+                if (q.isNullOrBlank() || q.length < 3) {
+                    return@handleGet badRequest(exchange, mapOf("error" to "Parameter 'q' required, min 3 chars"))
+                }
+                val limit = params["limit"]?.toIntOrNull() ?: 5
+                val results = geocoder.search(q, limit)
+                return@handleGet ok(exchange, results)
+            }
+        }
+
+        server.createContext("/geocoding/resolve") { exchange ->
+            handleGet(exchange) {
+                val params = queryParams(exchange.requestURI)
+                val q = params["q"]?.trim()
+                if (q.isNullOrBlank()) {
+                    return@handleGet badRequest(exchange, mapOf("error" to "Parameter 'q' required"))
+                }
+                val result = geocoder.resolve(q)
+                result
+                    .onSuccess { suggestion ->
+                        return@handleGet ok(exchange, mapOf("lat" to suggestion.lat, "lon" to suggestion.lon))
+                    }
+                    .onFailure { error ->
+                        return@handleGet when (error) {
+                            is NoSuchElementException -> respond(exchange, 404, mapOf("error" to "Address not found"))
+                            is UpstreamGeocodingException -> respond(exchange, 502, mapOf("error" to "Upstream geocoding failure"))
+                            is IllegalStateException -> respond(exchange, 422, mapOf("error" to "Invalid coordinates in result"))
+                            else -> internalError(exchange, mapOf("error" to (error.message ?: "Unknown error")))
+                        }
+                    }
             }
         }
 
@@ -65,11 +111,12 @@ class ApiServer(
         LOG.info("HTTP API server started on port {}", port)
     }
 
-    private fun validateParameters(params: Map<String, String>): Result<Unit> {
+    private fun validateNearParameters(params: Map<String, String>): Result<Unit> {
         val lat = params["lat"]
         val lon = params["lon"]
         val distance = params["distance"]
         val gasType = params["gasType"]
+        val sortBy = params["sortBy"]
 
         if (lat == null || lon == null || lat.toDoubleOrNull() == null || lon.toDoubleOrNull() == null) {
             return Result.failure(IllegalArgumentException("Missing or invalid lat/lon parameters"))
@@ -79,6 +126,9 @@ class ApiServer(
         }
         if (gasType == null || gasType.isBlank()) {
             return Result.failure(IllegalArgumentException("Missing or invalid gas type parameter"))
+        }
+        if (sortBy != null && sortBy.lowercase() != "price" && sortBy.lowercase() != "distance") {
+            return Result.failure(IllegalArgumentException("Invalid sortBy parameter. Allowed: price, distance"))
         }
         return Result.success(Unit)
     }
@@ -132,7 +182,6 @@ class ApiServer(
     }
 
     private fun normalizeGasType(g: String): String {
-        // Accept both enum-like names and internal keys
         return when (g.uppercase()) {
             "GASOLINA_95_E5" -> GASOLINA_95_E5
             "GASOLINA_95_E5_PREMIUM" -> GASOLINA_95_E5_PREMIUM
