@@ -18,7 +18,7 @@ import org.litote.kmongo.getCollectionOfName
 import java.util.concurrent.TimeUnit.MINUTES
 
 private const val INITIAL_DELAY = 0L
-private const val PERIOD = 30L
+private const val PERIOD = 120L
 
 fun main() {
     val gasStationPersister = GasStationPersisterMongo(mongoCollection())
