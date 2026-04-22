@@ -41,7 +41,6 @@ class GasStationPersisterMongo(private val collection: MongoCollection<GasStatio
             val results = mutableListOf<GasStationDto>()
             collection.find(query)
                 .sort(gasPriceAscFilter)
-                .limit(MAX_GAS_STATIONS_TO_RETRIEVE)
                 .into(results)
             results.map { gasStationDto -> gasStationDto.toDomain() }
         }.onFailure {

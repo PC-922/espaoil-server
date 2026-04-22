@@ -15,11 +15,19 @@ services:
     environment:
       - PORT=8080
       - DATABASE_URL=mongodb://user:password@db:27017/?authSource=admin
+      - GRADLE_USER_HOME=/home/gradle
     ports:
       - "8080:8080"
+      - "5005:5005"
     depends_on:
       db:
         condition: service_healthy
+    # Live reload: mount source files + gradle cache
+    volumes:
+      - ../app/src/main/kotlin:/app/app/src/main/kotlin
+      - ../app/src/test/kotlin:/app/app/src/test/kotlin
+      - gradle-cache:/home/gradle/.gradle
+    working_dir: /app
 
   db:
     image: mongo:6.0.2
@@ -38,3 +46,6 @@ services:
       MONGO_USERNAME: user
       MONGO_PASSWORD: password
       MONGO_INITDB_DATABASE: espaoil
+
+volumes:
+  gradle-cache:
