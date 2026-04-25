@@ -15,12 +15,25 @@ import java.io.IOException
 private const val GAS_STATIONS_SOURCE =
     "https://sedeaplicaciones.minetur.gob.es/ServiciosRESTCarburantes/PreciosCarburantes/EstacionesTerrestres/"
 
-class GasStationsRetrieverFromSpanishGovernment(private val url: URLWrapper) : GasStationsRetriever {
-    override fun apply() = runCatching {
-        val gasStationsAsJson = url.get(GAS_STATIONS_SOURCE)
-        gasStationsFrom(gasStationsAsJson)
-    }.onFailure {
-        throw FailedToRetrieveGasStations(it)
+private const val MAX_RETRIES = 3
+private const val RETRY_DELAY_MS = 2_000L
+
+class GasStationsRetrieverFromSpanishGovernment(
+    private val url: URLWrapper,
+    private val maxRetries: Int = MAX_RETRIES,
+    private val retryDelayMs: Long = RETRY_DELAY_MS,
+) : GasStationsRetriever {
+    override fun apply(): Result<List<GasStation>> {
+        var lastError: Throwable? = null
+        repeat(maxRetries) { attempt ->
+            if (attempt > 0) Thread.sleep(retryDelayMs * (1L shl (attempt - 1)))
+            runCatching {
+                val gasStationsAsJson = url.get(GAS_STATIONS_SOURCE)
+                gasStationsFrom(gasStationsAsJson)
+            }.onSuccess { return Result.success(it) }
+             .onFailure { lastError = it }
+        }
+        return Result.failure(FailedToRetrieveGasStations(lastError!!))
     }
 
     private fun gasStationsFrom(gasStationInfoJson: String): List<GasStation> =
