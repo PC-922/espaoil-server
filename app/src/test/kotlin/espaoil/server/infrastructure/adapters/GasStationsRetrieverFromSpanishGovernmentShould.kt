@@ -24,7 +24,7 @@ class GasStationsRetrieverFromSpanishGovernmentShould {
 
     @BeforeEach
     internal fun setUp() {
-        gasStationsRetriever = GasStationsRetrieverFromSpanishGovernment(requester)
+        gasStationsRetriever = GasStationsRetrieverFromSpanishGovernment(requester, retryDelayMs = 0)
     }
 
     @Test
@@ -40,7 +40,7 @@ class GasStationsRetrieverFromSpanishGovernmentShould {
         every { requester.get(any()) }.returns("")
 
         assertFailsWith<FailedToRetrieveGasStations> {
-            gasStationsRetriever.apply()
+            gasStationsRetriever.apply().getOrThrow()
         }
     }
 
@@ -48,6 +48,25 @@ class GasStationsRetrieverFromSpanishGovernmentShould {
     fun `raise an error when failing to download gas stations`() {
         every { requester.get(any()) }.throws(RuntimeException())
 
-        assertFailsWith<FailedToRetrieveGasStations> { gasStationsRetriever.apply() }
+        assertFailsWith<FailedToRetrieveGasStations> { gasStationsRetriever.apply().getOrThrow() }
+    }
+
+    @Test
+    fun `retry and succeed after a transient network failure`() {
+        val expectedGasStation = javaClass.getResource(EXPECTED_GAS_STATION_JSON)?.readText()!!
+        every { requester.get(any()) } answers { throw RuntimeException() } andThen expectedGasStation
+
+        val result = gasStationsRetriever.apply()
+
+        assertEquals(aGasStation(), result.getOrThrow())
+    }
+
+    @Test
+    fun `raise an error when all retry attempts fail`() {
+        every { requester.get(any()) }.throws(RuntimeException())
+
+        assertFailsWith<FailedToRetrieveGasStations> {
+            GasStationsRetrieverFromSpanishGovernment(requester, maxRetries = 2, retryDelayMs = 0).apply().getOrThrow()
+        }
     }
 }
