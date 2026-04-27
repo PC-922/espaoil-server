@@ -31,9 +31,8 @@ class GasStationsRetrieverFromSpanishGovernment(
         repeat(maxRetries) { attempt ->
             val currentAttempt = attempt + 1
             if (attempt > 0) {
-                val sleepTime = retryDelayMs * (1L shl (attempt - 1))
-                logger.info("Retrying to retrieve gas stations (attempt $currentAttempt/$maxRetries) after ${sleepTime}ms...")
-                Thread.sleep(sleepTime)
+                logger.info("Retrying to retrieve gas stations (attempt $currentAttempt/$maxRetries) after ${retryDelayMs}ms...")
+                Thread.sleep(retryDelayMs)
             }
             runCatching {
                 val gasStationsAsJson = url.get(GAS_STATIONS_SOURCE)
