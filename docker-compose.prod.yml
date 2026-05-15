@@ -2,15 +2,37 @@ version: '3.8'
 
 services:
   espaoilserver:
-    build: 
+    build:
       context: .
       dockerfile: Dockerfile.prod
     container_name: espaoilserver
     ports:
-      - "8080:8080"
+      - "8087:8080"
+    environment:
+      DATABASE_URL: mongodb://user:password@mongodb:27017/espaoil?authSource=admin&ssl=false
+    depends_on:
+      - mongodb
     networks:
       - coolify
+      - backend
+
+  mongodb:
+    image: mongo:7
+    container_name: espaoil_mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: user
+      MONGO_INITDB_ROOT_PASSWORD: password
+      MONGO_INITDB_DATABASE: espaoil
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - backend
 
 networks:
   coolify:
     external: true
+  backend:
+
+volumes:
+  mongodb_data:
