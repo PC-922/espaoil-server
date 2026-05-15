@@ -7,26 +7,26 @@ import java.net.http.HttpResponse
 import java.time.Duration
 import java.util.zip.GZIPInputStream
 import java.io.ByteArrayInputStream
+import javax.net.ssl.SSLContext
+import javax.net.ssl.SSLParameters
 import kotlin.text.Charsets.UTF_8
 
 private const val CONNECT_TIMEOUT_MS = 10_000L
-private const val READ_TIMEOUT_MS = 60_000L
-private const val USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+private const val READ_TIMEOUT_MS = 30_000L
 
 class URLWrapper {
     private val client = HttpClient.newBuilder()
         .followRedirects(HttpClient.Redirect.ALWAYS)
         .connectTimeout(Duration.ofMillis(CONNECT_TIMEOUT_MS))
+        .sslContext(SSLContext.getInstance("TLSv1.2").apply { init(null, null, null) })
+        .sslParameters(SSLParameters().apply { protocols = arrayOf("TLSv1.2") })
         .build()
 
     fun get(url: String): String {
         val request = HttpRequest.newBuilder()
             .uri(URI.create(url))
             .header("Accept", "application/json, text/plain, */*")
-            .header("User-Agent", USER_AGENT)
             .header("Accept-Encoding", "gzip")
-            .header("Accept-Language", "es-ES,es;q=0.9,en;q=0.8")
-            .header("Cache-Control", "no-cache")
             .timeout(Duration.ofMillis(READ_TIMEOUT_MS))
             .GET()
             .build()
