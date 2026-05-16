@@ -6,8 +6,6 @@ services:
       context: .
       dockerfile: Dockerfile.prod
     container_name: espaoilserver
-    ports:
-      - "8087:8080"
     environment:
       DATABASE_URL: mongodb://user:password@mongodb:27017/espaoil?authSource=admin&ssl=false
     depends_on:
