@@ -9,10 +9,17 @@ services:
     environment:
       DATABASE_URL: mongodb://user:password@mongodb:27017/espaoil?authSource=admin&ssl=false
     depends_on:
-      - mongodb
+      mongodb:
+        condition: service_healthy
     networks:
       - coolify
       - backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 1m30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   mongodb:
     image: mongo:7
@@ -26,6 +33,12 @@ services:
       - mongodb_data:/data/db
     networks:
       - backend
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
 networks:
   coolify:
