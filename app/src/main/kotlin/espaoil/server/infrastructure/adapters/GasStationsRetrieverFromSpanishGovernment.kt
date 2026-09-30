@@ -16,36 +16,12 @@ import java.io.IOException
 private const val GAS_STATIONS_SOURCE =
     "https://sedeaplicaciones.minetur.gob.es/ServiciosRESTCarburantes/PreciosCarburantes/EstacionesTerrestres/"
 
-private const val MAX_RETRIES = 5
-private const val RETRY_DELAY_MS = 300_000L // 5 minutes
-
-class GasStationsRetrieverFromSpanishGovernment(
-    private val url: URLWrapper,
-    private val maxRetries: Int = MAX_RETRIES,
-    private val retryDelayMs: Long = RETRY_DELAY_MS,
-) : GasStationsRetriever {
-    private val logger = LoggerFactory.getLogger(GasStationsRetrieverFromSpanishGovernment::class.java)
-
-    override fun apply(): Result<List<GasStation>> {
-        var lastError: Throwable? = null
-        repeat(maxRetries) { attempt ->
-            val currentAttempt = attempt + 1
-            if (attempt > 0) {
-                logger.info("Retrying to retrieve gas stations (attempt $currentAttempt/$maxRetries) after ${retryDelayMs}ms...")
-                Thread.sleep(retryDelayMs)
-            }
-            runCatching {
-                val gasStationsAsJson = url.get(GAS_STATIONS_SOURCE)
-                gasStationsFrom(gasStationsAsJson)
-            }.onSuccess {
-                if (attempt > 0) logger.info("Successfully retrieved gas stations on attempt $currentAttempt")
-                return Result.success(it)
-            }.onFailure {
-                lastError = it
-                logger.warn("Failed to retrieve gas stations on attempt $currentAttempt/$maxRetries: ${it.message}")
-            }
-        }
-        return Result.failure(FailedToRetrieveGasStations(lastError!!))
+class GasStationsRetrieverFromSpanishGovernment(private val url: URLWrapper) : GasStationsRetriever {
+    override fun apply() = runCatching {
+        val gasStationsAsJson = url.get(GAS_STATIONS_SOURCE)
+        gasStationsFrom(gasStationsAsJson)
+    }.onFailure {
+        throw FailedToRetrieveGasStations(it)
     }
 
     private fun gasStationsFrom(gasStationInfoJson: String): List<GasStation> =

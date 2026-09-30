@@ -12,3 +12,5 @@ app/build
 
 # Ignore environment variables
 .env
+
+.vscode
