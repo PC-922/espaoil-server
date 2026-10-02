@@ -16,3 +16,5 @@ app/build
 .vscode
 
 .atl
+
+bin/

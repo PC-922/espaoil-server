@@ -14,6 +14,7 @@ dependencies {
     api("org.slf4j:slf4j-api:1.7.36")
     implementation("org.litote.kmongo:kmongo:4.7.1")
     implementation("com.google.code.gson:gson:2.9.0")
+    implementation("com.squareup.okhttp3:okhttp:4.10.0")
     implementation("org.mongodb:mongodb-driver-core:4.7.0")
     implementation("org.slf4j:slf4j-api:1.7.36")
     implementation("org.slf4j:slf4j-simple:1.7.36")
